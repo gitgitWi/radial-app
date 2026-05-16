@@ -37,27 +37,46 @@
 
 ### 3.1 옴니 인풋 플로팅 윈도우
 
-| 항목 | v3 명세 |
-|---|---|
-| 호출 단축키 | 기본값 `Cmd+Shift+Space`, 사용자 설정에서 변경 가능 |
-| 모드 | Task / Agent |
-| 모드 토글 | 기본 `Shift+Tab`, 추후 설정 가능 |
-| Task 모드 | 입력 즉시 `backlog` 티켓 생성 |
-| Agent 모드 | CLI 도구(Claude Code / Code CLI / Gemini CLI / OpenCode), 모델, 옵션 선택 후 Agent 티켓 생성 |
-| Agent 티켓 상태 | 생성 시 `backlog`, 실행 큐 진입 시 `queued`, 프로세스 시작 시 `running`, 승인/입력 대기 시 `waiting`, 실패 시 `failed`, 완료 시 `done` |
-| 최근값 | workspace, CLI, 모델, 주요 옵션의 마지막 성공값 저장 |
-| 터미널 전환 | Agent 실행 시 입력창이 터미널 오버레이로 확장되고 stdout/stderr를 실시간 표시 |
+#### 호출 단축키
+
+기본값은 `Cmd+Shift+Space`이며, 사용자 설정에서 변경 가능해야 한다.
+
+#### 모드
+
+Task와 Agent 두 가지 모드를 제공한다.
+
+#### 모드 토글
+
+기본 토글은 `Shift+Tab`이며, 추후 설정 가능하도록 둔다.
+
+#### Task 모드
+
+입력 즉시 `backlog` 티켓을 생성한다.
+
+#### Agent 모드
+
+CLI 도구(Claude Code / Code CLI / Gemini CLI / OpenCode), 모델, 옵션 선택 후 Agent 티켓을 생성한다.
+
+#### Agent 티켓 상태
+
+생성 시 `backlog`, 실행 큐 진입 시 `queued`, 프로세스 시작 시 `running`, 승인/입력 대기 시 `waiting`, 실패 시 `failed`, 완료 시 `done`으로 이동한다.
+
+#### 최근값
+
+workspace, CLI, 모델, 주요 옵션의 마지막 성공값을 저장한다.
+
+#### 터미널 전환
+
+Agent 실행 시 입력창이 터미널 오버레이로 확장되고 stdout/stderr를 실시간 표시한다.
 
 ### 3.2 칸반과 상태 모델
 
 v2의 `In Progress (Human / Agent / Waiting / Failed)` 구조는 UI 관점에서는 이해하기 쉽지만, 데이터 모델에서는 status와 assignee/type이 섞일 위험이 있다. v3에서는 데이터 모델을 분리한다.
 
-| 개념 | 값 |
-|---|---|
-| `Ticket.type` | `task`, `agent` |
-| `Ticket.status` | `backlog`, `todo`, `queued`, `running`, `waiting`, `failed`, `done`, `archived` |
-| `Ticket.assignee_type` | `human`, `agent`, `none` |
-| `AgentSession.state` | `created`, `worktree_preparing`, `queued`, `starting`, `running`, `waiting_input`, `exited`, `failed`, `orphaned`, `recovered` |
+- `Ticket.type`: `task`, `agent`
+- `Ticket.status`: `backlog`, `todo`, `queued`, `running`, `waiting`, `failed`, `done`, `archived`
+- `Ticket.assignee_type`: `human`, `agent`, `none`
+- `AgentSession.state`: `created`, `worktree_preparing`, `queued`, `starting`, `running`, `waiting_input`, `exited`, `failed`, `orphaned`, `recovered`
 
 UI 컬럼은 데이터 status를 그대로 노출하지 않아도 된다. 예를 들어 `queued`와 `waiting`은 Kanban에서 Agent lane 내부에 표시하고, `failed`는 별도 attention lane으로 보여줄 수 있다.
 
@@ -162,14 +181,29 @@ Skill 패키지는 다음을 포함한다.
 
 ### 3.6 Worktree와 workspace 준비
 
-| 항목 | v3 명세 |
-|---|---|
-| 생성 경로 | `.agentflow/worktrees/<ticket-id>` |
-| 브랜치 | `agentflow/<workspace-slug>/<ticket-slug>-<ticket-id>` |
-| 초기화 스크립트 | `post_worktree`, `pre_agent`를 workspace 설정으로 관리 |
-| instruction 주입 | `CLAUDE.md`, `AGENTS.md`, 기타 CLI별 instruction 파일 복사 또는 append |
-| secrets | 기본은 자동 복사하지 않음. workspace 설정에서 명시적으로 허용 |
-| 정리 | Done 후 수동 머지/삭제. dirty worktree는 자동 삭제 금지 |
+#### 생성 경로
+
+`.agentflow/worktrees/<ticket-id>`를 사용한다.
+
+#### 브랜치
+
+`agentflow/<workspace-slug>/<ticket-slug>-<ticket-id>` 형식으로 생성한다.
+
+#### 초기화 스크립트
+
+`post_worktree`, `pre_agent`를 workspace 설정으로 관리한다.
+
+#### Instruction 주입
+
+`CLAUDE.md`, `AGENTS.md`, 기타 CLI별 instruction 파일을 복사하거나 append한다.
+
+#### Secrets
+
+기본은 자동 복사하지 않는다. workspace 설정에서 명시적으로 허용한 경우에만 복사한다.
+
+#### 정리
+
+Done 후 수동 머지/삭제 흐름을 제공한다. dirty worktree는 자동 삭제하지 않는다.
 
 초기화 스크립트는 가장 큰 지연 요인 중 하나다. v1에서는 "항상 실행"보다 "workspace별 default + ticket별 override" 구조가 필요하다.
 
@@ -202,18 +236,45 @@ Mobile/Web의 v1 범위는 다음으로 제한한다.
 
 ### 4.1 레이어
 
-| 레이어 | 선택 |
-|---|---|
-| Desktop app | Tauri v2 + React + TypeScript |
-| Backend core | Rust command handlers + SQLite |
-| Terminal | wterm 우선, xterm.js fallback |
-| Session manager | tmux |
-| PTY | `portable-pty` 검토, tmux attach path와 역할 분리 |
-| Local DB | SQLite |
-| Sync | Turso/libSQL Embedded Replica |
-| Web | Next.js |
-| Mobile | React Native 또는 Tauri v2 Mobile 검토 |
-| Agent control | `agentflow` CLI + Unix domain socket + Skill/Instruction 패키지 |
+#### Desktop app
+
+Tauri v2 + React + TypeScript
+
+#### Backend core
+
+Rust command handlers + SQLite
+
+#### Terminal
+
+wterm 우선, xterm.js fallback
+
+#### Session manager
+
+tmux
+
+#### PTY
+
+`portable-pty`를 검토하되, tmux attach path와 역할을 분리한다.
+
+#### Local DB
+
+SQLite
+
+#### Sync
+
+Turso/libSQL Embedded Replica
+
+#### Web
+
+Next.js
+
+#### Mobile
+
+React Native 또는 Tauri v2 Mobile 검토
+
+#### Agent control
+
+`agentflow` CLI + Unix domain socket + Skill/Instruction 패키지
 
 ### 4.2 데이터 모델 보강
 
@@ -431,20 +492,65 @@ flowchart LR
 
 ## 6. 주요 리스크와 대응
 
-| 리스크 | 영향 | 대응 |
-|---|---|---|
-| wterm 통합이 예상보다 불안정 | v1 일정 지연 | Phase 0에서 fallback 결정. xterm.js를 즉시 대체 경로로 유지 |
-| tmux 외부 의존성 | 신규 환경에서 실행 실패 | 앱 시작 시 dependency check, 설치 가이드, fallback 안내 |
-| CLI별 동작 방식 차이 | 상태 추적 불안정 | 공통 abstraction보다 CLI별 command template + capability registry 우선 |
-| hook 파싱 실패 | 칸반 상태 부정확 | raw log 보존, exit code와 CLI Bridge 이벤트를 보조 signal로 사용 |
-| worktree 초기화 지연 | Agent spawn 3초 기준 실패 | 티켓 생성과 실행 준비를 분리. UI는 queued/preparing 상태를 즉시 표시 |
-| dependency install 중복 | 디스크/시간 낭비 | workspace별 setup script를 명시하고, 캐시/skip 옵션 제공 |
-| secrets 자동 복사 위험 | 보안 사고 | 기본 비활성화. 사용자가 허용한 파일만 복사 |
-| yolo mode 위험 | 원치 않는 파일 변경 | workspace 단위 표시, worktree 격리, diff review 강화 |
-| 앱 크래시 | UI 상태 유실 | tmux + SQLite metadata + raw log로 복구 |
-| 시스템 OOM | 세션 강제 종료 | 동시 실행 제한, watchdog, hard limit 실패 처리 |
-| Turso 충돌 | 상태 뒤섞임 | Phase 3까지 이연. server-stamp와 conflict notification 구현 |
-| Mobile 기술 선택 불확실 | 중복 구현 비용 | Phase 3 직전 Tauri v2 Mobile spike로 결정 |
+### wterm 통합이 예상보다 불안정
+
+- 영향: v1 일정 지연
+- 대응: Phase 0에서 fallback을 결정하고, xterm.js를 즉시 대체 경로로 유지한다.
+
+### tmux 외부 의존성
+
+- 영향: 신규 환경에서 실행 실패
+- 대응: 앱 시작 시 dependency check, 설치 가이드, fallback 안내를 제공한다.
+
+### CLI별 동작 방식 차이
+
+- 영향: 상태 추적 불안정
+- 대응: 공통 abstraction보다 CLI별 command template + capability registry를 우선한다.
+
+### hook 파싱 실패
+
+- 영향: 칸반 상태 부정확
+- 대응: raw log를 보존하고, exit code와 CLI Bridge 이벤트를 보조 signal로 사용한다.
+
+### worktree 초기화 지연
+
+- 영향: Agent spawn 3초 기준 실패
+- 대응: 티켓 생성과 실행 준비를 분리하고, UI는 queued/preparing 상태를 즉시 표시한다.
+
+### dependency install 중복
+
+- 영향: 디스크/시간 낭비
+- 대응: workspace별 setup script를 명시하고, 캐시/skip 옵션을 제공한다.
+
+### secrets 자동 복사 위험
+
+- 영향: 보안 사고
+- 대응: 기본 비활성화한다. 사용자가 허용한 파일만 복사한다.
+
+### yolo mode 위험
+
+- 영향: 원치 않는 파일 변경
+- 대응: workspace 단위 표시, worktree 격리, diff review를 강화한다.
+
+### 앱 크래시
+
+- 영향: UI 상태 유실
+- 대응: tmux + SQLite metadata + raw log로 복구한다.
+
+### 시스템 OOM
+
+- 영향: 세션 강제 종료
+- 대응: 동시 실행 제한, watchdog, hard limit 실패 처리를 적용한다.
+
+### Turso 충돌
+
+- 영향: 상태 뒤섞임
+- 대응: Phase 3까지 이연하고, server-stamp와 conflict notification을 구현한다.
+
+### Mobile 기술 선택 불확실
+
+- 영향: 중복 구현 비용
+- 대응: Phase 3 직전 Tauri v2 Mobile spike로 결정한다.
 
 ---
 
