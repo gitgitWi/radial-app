@@ -1,7 +1,7 @@
-# 🚀 프로젝트 기획서 v2: Agentic Task & Terminal Manager (AgentFlow)
+# 프로젝트 기획서 v2: Agentic Task & Terminal Manager (AgentFlow)
 
 > **버전**: v2 (2026-05-16)
-> **변경 요약**: 기능은 v1과 동일하게 유지하되, Phase 재조정 / Worktree·세션 영속성·OOM 대응 추가 / Agent Adapter·비용 추적·MCP 등은 후속 버전으로 이연 / Turso 동기화는 핵심 목표로 유지(Mac/Web/Mobile 멀티 클라이언트)
+> **변경 요약**: 기능은 v1과 동일하게 유지하되, Phase 재조정 / Worktree·세션 영속성·OOM 대응 추가 / Agent Adapter·비용 추적·Skill 패키지 등은 후속 버전으로 이연 / Turso 동기화는 핵심 목표로 유지(Mac/Web/Mobile 멀티 클라이언트)
 
 ---
 
@@ -18,13 +18,13 @@ Local-first 아키텍처로 오프라인에서도 즉각 반응하며, 백그라
 - **Local-first, sync-augmented**: 모든 동작은 로컬에서 즉시 완결, 동기화는 보조 레이어
 - **Yolo by default**: 권한 모델은 yolo 모드를 기본 가정으로 단순화 (정교한 정책 모델은 후속)
 - **Resilience over polish**: 앱·시스템 크래시 시에도 에이전트 작업이 유실되지 않도록 우선 설계
-- **Defer complexity**: Agent Adapter / MCP / 정교한 권한 시스템 등은 v1에서 의도적으로 단순화
+- **Defer complexity**: Agent Adapter / Skill 패키지 / 정교한 권한 시스템 등은 v1에서 의도적으로 단순화
 
 ---
 
 ## 2. 유사 프로젝트 (참고용)
 
-- **Muxy** — Tauri 기반 AI 친화 터미널. 기술 스택 레퍼런스로 활용
+- **Muxy** — SwiftUI + libghostty 기반 AI 친화 터미널. 터미널 UX와 에이전트 친화 패턴 참고
 - **Conductor.build** — Git worktree + 에이전트 오케스트레이션 패턴 참고
 - **Raycast / Spotlight** — 플로팅 UI 호출 패턴
 - **Linear** — Local-first 칸반의 키보드 친화적 UX
@@ -40,10 +40,11 @@ Local-first 아키텍처로 오프라인에서도 즉각 반응하며, 백그라
 
 | 항목 | 명세 |
 |---|---|
-| 호출 단축키 | `Cmd+Shift+Space` (커스터마이즈 가능) |
+| 호출 단축키 | 기본값 `Cmd+Shift+Space`, 사용자 설정에서 변경 가능 |
 | 모드 토글 | `Shift+Tab` 으로 Task ↔ Agent 즉시 전환 |
 | Task 모드 | 단순 이슈 텍스트 입력 → Enter → 로컬 DB 저장 → 칸반 백로그 |
-| Agent 모드 | 드롭다운으로 CLI 도구(Claude Code / Codex CLI / Gemini CLI / Qwen CLI) + 모델 선택 → 프롬프트 입력 → Enter → 자식 프로세스 spawn |
+| Agent 모드 | 드롭다운으로 CLI 도구(Claude Code / Code CLI / Gemini CLI / OpenCode) + 모델 선택 → 프롬프트 입력 → Enter → Agent 티켓 생성 및 자식 프로세스 spawn |
+| Agent 티켓 등록 | Agent 모드 입력도 즉시 칸반 Backlog에 추가하고, 실행 상태에 따라 Waiting / In Progress / Failed / Done으로 이동 |
 | 최근값 자동 저장 | 마지막 성공 케이스 자동 기억 |
 | 터미널 트랜지션 | Agent 실행 시 입력창이 하단으로 확장되며 wterm 터미널로 변환, stdout/stderr 실시간 스트리밍 |
 
@@ -51,7 +52,7 @@ Local-first 아키텍처로 오프라인에서도 즉각 반응하며, 백그라
 
 ```mermaid
 graph TD
-    A[Cmd+Shift+Space] --> B(플로팅 윈도우 팝업)
+    A[Configurable Shortcut] --> B(플로팅 윈도우 팝업)
     B --> C{Shift+Tab 모드 전환}
     C -->|Task 모드| D[이슈 텍스트 입력]
     C -->|Agent 모드| E[CLI/모델 선택 + 프롬프트]
@@ -61,7 +62,7 @@ graph TD
     H --> I[실시간 stdout/stderr 스트리밍 + SQLite append]
 ```
 
-### 3.2 Git Worktree 기반 격리 실행 🆕
+### 3.2 Git Worktree 기반 격리 실행
 
 각 Agent 티켓은 **자체 git worktree** 에서 실행되어 동시 다발적 에이전트 작업이 충돌하지 않도록 보장.
 
@@ -69,8 +70,8 @@ graph TD
 |---|---|
 | 생성 시점 | Agent 티켓 spawn 시 자동으로 `.agentflow/worktrees/<ticket-id>` 경로에 worktree 생성 |
 | 브랜치 명명 | `agentflow/<workspace>/<short-title-slug>-<ticket-id>` |
-| **커스텀 초기화 스크립트** 🆕 | Workspace 설정에서 `pre_agent.sh` / `post_worktree.sh` 같은 훅 지정 가능 (예: `pnpm install`, `.env` 복사, `direnv allow`) |
-| **커스텀 인스트럭션** 🆕 | Workspace 단위로 worktree에 주입할 시스템 프롬프트 파일(`CLAUDE.md`, `AGENTS.md` 등) 자동 복사·머지 규칙 정의 |
+| 커스텀 초기화 스크립트 | Workspace 설정에서 `pre_agent.sh` / `post_worktree.sh` 같은 훅 지정 가능 (예: `pnpm install`, `.env` 복사, `direnv allow`) |
+| 커스텀 인스트럭션 | Workspace 단위로 worktree에 주입할 시스템 프롬프트 파일(`CLAUDE.md`, `AGENTS.md` 등) 자동 복사·머지 규칙 정의 |
 | 정리 | 티켓 완료 시 머지(수동) 후 `git worktree remove` 옵션 제공. Dirty 상태면 보존. |
 
 ### 3.3 통합 칸반 대시보드
@@ -83,7 +84,7 @@ graph TD
 | 어태치/디태치 | 티켓 클릭 시 해당 tmux 세션을 오버레이로 attach. 닫으면 detach (세션은 살아있음) |
 | 키보드 네비게이션 | Linear 스타일 — `j/k` 이동, `e` 편집, `Cmd+Enter` 상태 변경 |
 
-### 3.4 백그라운드 프로세스 풀 (tmux 기반) 🔧
+### 3.4 백그라운드 프로세스 풀 (tmux 기반)
 
 | 항목 | 명세 |
 |---|---|
@@ -94,9 +95,9 @@ graph TD
 | 메모리 워치독 | Tauri 백엔드가 각 자식 프로세스 RSS 주기 모니터링 — soft limit 도달 시 OS 알림, hard limit 도달 시 강제 종료 후 Failed 처리 |
 | 시스템 OOM 대응 | tmux 세션은 별도 프로세스 트리에 있어 OS OOM killer가 앱만 죽일 가능성 높음 → 재시작 후 자동 복구 |
 
-### 3.5 양방향 에이전트 제어 (CLI Bridge → MCP로 격상) 🔧
+### 3.5 양방향 에이전트 제어 (CLI Bridge → AgentFlow Skill로 확장)
 
-> **변경**: v1은 MCP가 아닌 **CLI Bridge 방식**으로 단순 구현. MCP는 v2+에서 격상.
+> **변경**: v1은 **CLI Bridge 방식**으로 단순 구현. v2+에서는 MCP 서버보다 각 에이전트가 쉽게 로드할 수 있는 **AgentFlow Skill/Instruction 패키지**로 확장하는 방향이 더 적절함.
 
 #### v1: CLI Bridge
 - AgentFlow 앱이 작은 CLI 바이너리(`agentflow`)를 PATH에 설치
@@ -107,12 +108,12 @@ graph TD
   agentflow comment add <ticket-id> "테스트 통과 확인"
   ```
 - 내부적으로 Unix domain socket으로 앱과 IPC, 환경변수 `AGENTFLOW_TICKET_ID` 로 권한 스코프 자동 결정
-- **장점**: MCP 미지원 CLI도 즉시 호환, 구현 단순, 디버깅 쉬움
+- **장점**: 특정 프로토콜 지원 여부와 무관하게 CLI 도구와 호환, 구현 단순, 디버깅 쉬움
 
-#### v2+: 로컬 MCP 서버로 격상
-- Tauri Rust 백엔드에서 MCP 서버 호스팅 (Unix socket / named pipe transport)
-- `read_workspace`, `create_subtask`, `update_ticket_status` 등 풍부한 도구 제공
-- Discovery는 spawn 시 환경변수(`AGENTFLOW_MCP_URL`, `AGENTFLOW_TICKET_ID`) 주입
+#### v2+: AgentFlow Skill/Instruction 패키지
+- Claude Code / Code CLI / Gemini CLI / OpenCode별로 로드 가능한 사용법 문서와 명령 래퍼를 제공
+- `read_workspace`, `create_subtask`, `update_ticket_status`에 해당하는 작업은 `agentflow` CLI 명령으로 통일
+- Discovery는 spawn 시 환경변수(`AGENTFLOW_SOCKET`, `AGENTFLOW_TICKET_ID`, `AGENTFLOW_WORKSPACE_ID`)와 각 CLI별 instruction 파일 주입으로 처리
 
 ### 3.6 Workspace 컨텍스트
 
@@ -140,7 +141,7 @@ graph TD
 
 - **v1 기본 가정**: yolo mode (= Claude Code의 `--dangerously-skip-permissions` 류)
 - 그 외 모드는 워크스페이스 설정으로 노출만 해두고, 정교한 정책 엔진은 v3+로 이연
-- 시각적 표시: yolo 워크스페이스는 카드에 ⚠️ 뱃지 표시
+- 시각적 표시: yolo 워크스페이스는 카드에 위험 모드 뱃지 표시
 
 ---
 
@@ -153,7 +154,7 @@ graph TD
 | Frontend | React + TypeScript + TailwindCSS | |
 | 터미널 렌더링 | **wterm** (1순위) → 통합 이슈 시 **xterm.js** fallback | DOM 기반 렌더링·접근성 우선, Muxy와 무관한 선택 |
 | 데스크톱 프레임워크 | Tauri v2 (Rust) | PTY는 `portable-pty` crate, tmux는 외부 바이너리 의존 |
-| Mobile/Web 클라이언트 | React Native (Mobile) / Next.js (Web) | 보드 조회 + 티켓 작성 전용, 에이전트 실행 X |
+| Mobile/Web 클라이언트 | Tauri v2 Mobile 활용 검토 또는 React Native (Mobile) / Next.js (Web) | 보드 조회 + 티켓 작성 전용, 에이전트 실행 X |
 | IPC (CLI Bridge) | Unix domain socket (macOS/Linux) + named pipe (Windows) | |
 
 ### 4.2 데이터 계층: Local-first + Multi-client Sync
@@ -196,7 +197,7 @@ Comment
 
 ---
 
-## 5. 운영 이슈 & 리스크 대응 🆕
+## 5. 운영 이슈 & 리스크 대응
 
 | 리스크 | 대응 |
 |---|---|
@@ -227,7 +228,7 @@ Comment
 - Yolo 모드 기본 가정
 
 ### Phase 2 — 멀티 에이전트 + 알림 + UX 보강
-- 추가 CLI 통합 (Codex / Gemini / Qwen) — 단순 옵션 UI
+- 추가 CLI 통합 (Code CLI / Gemini CLI / OpenCode) — 단순 옵션 UI
 - Hook 기반 칸반 상태 자동 업데이트
 - 네이티브 OS 알림 (승인 대기 / 에러 / 완료 / 메모리 임계)
 - **CLI Bridge** (`agentflow` CLI + Unix socket) — 에이전트가 서브태스크 생성/수정 가능
@@ -244,7 +245,7 @@ Comment
 
 ### Phase 4 — Polish & 확장
 - 파일 트리 탐색기 + 일반 파일 뷰어
-- **MCP 서버로 CLI Bridge 격상** (선택)
+- **AgentFlow Skill/Instruction 패키지로 CLI Bridge 확장** (선택)
 - 세션 Replay (저장된 stdout 재생)
 - Diff 뷰어 (worktree 결과 머지 전 검토)
 - 프롬프트 히스토리 검색
