@@ -1,3 +1,25 @@
+---
+title: "AgentFlow Project Plan v2"
+document_type: "planning"
+version: "v2"
+status: "superseded"
+created_at: "2026-05-16"
+updated_at: "2026-05-16"
+project: "AgentFlow"
+scope: "Previous planning version for a local-first agentic task and terminal manager."
+summary: "Keeps the v1 feature direction while revising phases, adding worktree/session resilience/OOM handling, and deferring adapter and advanced permission complexity."
+audience: "AI agents and project owner"
+canonical_successor: ".planning/2026-05-16-project-ideation/plan.md"
+source_path: ".planning/2026-05-16-project-ideation/plan-versions/plan.v2.md"
+superseded_by: "plan.v3.md"
+key_topics:
+  - "omni input"
+  - "git worktree isolation"
+  - "tmux background process pool"
+  - "CLI Bridge"
+  - "Turso multi-client sync"
+---
+
 # 프로젝트 기획서 v2: Agentic Task & Terminal Manager (AgentFlow)
 
 > **버전**: v2 (2026-05-16)

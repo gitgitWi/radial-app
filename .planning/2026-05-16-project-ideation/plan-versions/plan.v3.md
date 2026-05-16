@@ -1,3 +1,27 @@
+---
+title: "AgentFlow Project Plan v3"
+document_type: "planning"
+version: "v3"
+status: "current"
+created_at: "2026-05-16"
+updated_at: "2026-05-16"
+project: "AgentFlow"
+scope: "Overview plan for a local-first agentic task and terminal manager."
+summary: "Refines v2 with execution pipeline, state model, phase gates, risk review, Mermaid diagrams, and implementation priorities."
+audience: "AI agents and project owner"
+canonical_path: ".planning/2026-05-16-project-ideation/plan.md"
+source_path: ".planning/2026-05-16-project-ideation/plan-versions/plan.v3.md"
+supersedes: "plan.v2.md"
+key_topics:
+  - "Mac desktop first"
+  - "local-first SQLite"
+  - "tmux session recovery"
+  - "git worktree isolation"
+  - "CLI Bridge"
+  - "AgentFlow Skill/Instruction package"
+  - "Turso/Web/Mobile sync later"
+---
+
 # 프로젝트 기획서 v3: Agentic Task & Terminal Manager (AgentFlow)
 
 > **버전**: v3 (2026-05-16)
