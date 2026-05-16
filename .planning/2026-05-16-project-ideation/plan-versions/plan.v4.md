@@ -104,6 +104,18 @@ Agent 실행 시 입력창이 터미널 오버레이로 확장되고 stdout/stde
 - `AgentSession.state`: `created`, `worktree_preparing`, `queued`, `starting`, `running`, `waiting_input`, `exited`, `failed`, `orphaned`, `recovered`
 - `QueueItem.state`: `pending`, `active`, `completed`, `cancelled`
 
+#### 작업 소요/규모 추적 필드 (v4 추가)
+
+향후 "예상 대비 실제 소요·규모" 대시보드(§9 후속 문서화 대상)의 기반 데이터를 v1부터 수집한다. 별도 분석 테이블 없이 `Ticket` / `AgentSession`에 필드만 추가하고, 대시보드 UI는 Phase 4 이후로 이연한다.
+
+- `Ticket.estimated_size`: 티켓 생성 시 사용자가 입력하는 작업 규모. 단위는 t-shirt 사이즈 enum (`xs`, `s`, `m`, `l`, `xl`). 미입력 허용(`null`).
+- `Ticket.actual_size`: 티켓 완료(`done` 또는 `failed`) 시점에 확정되는 실제 규모. 기본은 사용자 입력, 미입력 시 `AgentSession` 누적 실행 시간 기반 휴리스틱으로 자동 추정(예: <15분=xs, <1h=s, <4h=m, <1d=l, ≥1d=xl). 자동 추정 여부는 `actual_size_source` (`user`, `auto`)로 구분.
+- `Ticket.started_at`: 티켓이 처음 `running` 상태에 도달한 시각. Agent 티켓은 연결된 `AgentSession.state`가 `running`이 된 최초 시각, Task 티켓은 사용자가 `todo → running`으로 옮긴 시각. 한 번 set되면 이후 재실행에도 갱신하지 않는다(latency = `started_at - created_at`을 보존하기 위함).
+- `Ticket.first_response_at`: Agent 티켓에서 첫 stdout 또는 첫 hook 이벤트 도달 시각. dogfood 정량 지표(§8 p50 ≤ 10초)의 source of truth.
+- `AgentSession`은 기존 `started_at`, `finished_at`을 유지하되, 단일 티켓에 여러 세션이 붙는 경우(재실행) 누적 wall-clock은 sum(`finished_at - started_at`)로 계산한다.
+
+위 필드는 모두 sync 대상에 포함되며(SessionEvent 제외 규칙과 별개), `sync_origin`을 따라 충돌 처리한다.
+
 #### Ticket.status `todo`와 `archived`
 
 - `todo`: Task 티켓이 사용자에 의해 명시적으로 시작 준비된 상태(드래그로 todo lane 진입). Agent 티켓은 사용하지 않는다.
@@ -337,6 +349,8 @@ Ticket
   id, workspace_id, type, title, description
   status, assignee_type, parent_ticket_id
   priority, created_at, updated_at, completed_at
+  started_at, first_response_at
+  estimated_size, actual_size, actual_size_source
   sync_version, sync_origin, last_local_event_id
 
 AgentSession
@@ -361,6 +375,8 @@ Comment
 #### v4 추가 필드
 
 - `Ticket.sync_origin` / `Comment.sync_origin`: device_id. Phase 3 conflict UI의 기반.
+- `Ticket.started_at` / `Ticket.first_response_at`: §3.2 작업 소요/규모 추적용. latency·delay·dashboard 지표의 source of truth.
+- `Ticket.estimated_size` / `Ticket.actual_size` / `Ticket.actual_size_source`: §3.2 t-shirt 사이즈 enum과 자동 추정 출처 구분.
 - `AgentSession.raw_log_path`: 별도 파일 경로 명시.
 - `SessionEvent.sequence`: 동일 ms 내 이벤트 순서 보장(local DB 단위 monotonic).
 - `QueueItem.retry_count`: CAS 실패 재시도 카운터.
@@ -714,3 +730,4 @@ flowchart TD
 - Phase 2.5: capability registry 확장, Code CLI / Gemini CLI hook 차이, Skill 패키지 CLI별 분리
 - Phase 3: sync schema, conflict UI, Web/Mobile 기술 선택 결과
 - Phase 4: diff/replay UX, OpenCode adapter, full permission model 설계
+- Phase 4+ (별도): **작업 소요·규모 대시보드** — `Ticket.estimated_size` vs `actual_size`, `created_at → started_at` latency, `started_at → completed_at` duration, AgentSession 누적 wall-clock을 집계해 워크스페이스/CLI/티켓 유형별 예측치와 지연 추이를 시각화. v1~Phase 3은 필드 수집만, 분석 UI는 충분한 데이터(최소 50개 이상 완료 티켓) 축적 후 설계.
