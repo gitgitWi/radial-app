@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Multi-LLM review diagnostic runlogs (see .planning/*/code-reviews/)
+*runlog*
+
+# AgentFlow runtime artifacts (per plan.v4 §3.6, §3.7)
+.agentflow/worktrees/
+.agentflow/logs/
