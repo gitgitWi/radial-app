@@ -65,6 +65,61 @@ UI 컬럼은 데이터 status를 그대로 노출하지 않아도 된다. 예를
 
 Agent 티켓 실행은 다음 순서로 고정한다.
 
+```mermaid
+flowchart TD
+    A[Omni Input: Agent 모드 제출] --> B[Ticket 생성<br/>status: backlog]
+    B --> C{동시 실행 슬롯 있음?}
+    C -->|없음| D[QueueItem 생성<br/>status: queued]
+    D --> C
+    C -->|있음| E[Worktree 생성<br/>AgentSession: worktree_preparing]
+    E --> F[Workspace 준비<br/>env 정책, instruction 주입, setup script]
+    F --> G{준비 성공?}
+    G -->|실패| H[Ticket: failed<br/>failure_reason 기록]
+    G -->|성공| I[tmux detached session 생성]
+    I --> J[CLI 실행<br/>Claude Code / Code CLI / Gemini CLI / OpenCode]
+    J --> K[Terminal overlay attach 가능<br/>raw stdout/stderr append]
+    K --> L{Runtime signal}
+    L -->|hook / CLI Bridge| M[Ticket 및 Session 상태 업데이트]
+    L -->|watchdog limit| N[OS 알림 후 failed 처리]
+    L -->|exit code 0| O[Ticket: done 후보<br/>사용자 검토 가능]
+    L -->|exit code != 0| H
+    M --> K
+    O --> P[수동 merge / cleanup 후보]
+```
+
+```mermaid
+flowchart LR
+    subgraph Persistent["Persisted State"]
+        T[Ticket]
+        S[AgentSession]
+        E[SessionEvent / Raw Log]
+        Q[QueueItem]
+    end
+
+    subgraph Runtime["Runtime Processes"]
+        TMUX[tmux session]
+        CLI[Agent CLI process]
+        WD[Memory watchdog]
+    end
+
+    subgraph Recovery["Recovery Path"]
+        R[App restart]
+        LS[tmux ls]
+        ORPHAN[orphaned / recovered state]
+    end
+
+    T <--> S
+    S --> Q
+    TMUX --> CLI
+    CLI --> E
+    CLI --> S
+    WD --> S
+    R --> LS
+    LS --> S
+    S --> ORPHAN
+    ORPHAN --> T
+```
+
 1. Ticket 생성: Agent 모드 입력을 `backlog`에 기록한다.
 2. Queue 등록: 동시 실행 제한을 확인하고 실행 가능하면 `queued`로 이동한다.
 3. Worktree 생성: `.agentflow/worktrees/<ticket-id>`에 worktree와 branch를 만든다.
@@ -207,6 +262,50 @@ Comment
 ---
 
 ## 5. Phase 계획
+
+```mermaid
+flowchart TD
+    P0[Phase 0<br/>Technical Spike] --> G0{기술 선택 게이트<br/>wterm/tmux/SQLite/shortcut 검증}
+    G0 -->|통과| P1[Phase 1<br/>Desktop MVP]
+    G0 -->|wterm 실패| XTERM[xterm.js fallback 확정]
+    XTERM --> P1
+
+    P1 --> G1{Dogfood 게이트<br/>단일 Agent 실행, worktree, tmux 복구}
+    G1 -->|통과| P2[Phase 2<br/>Multi-agent Runtime]
+    G1 -->|복구 불안정| R1[tmux lifecycle / state machine 보강]
+    R1 --> G1
+
+    P2 --> G2{Runtime 게이트<br/>N=3 queue, watchdog, CLI Bridge}
+    G2 -->|통과| P3[Phase 3<br/>Sync, Web, Mobile]
+    G2 -->|상태 추적 불안정| R2[CLI capability registry / raw log 기반 보강]
+    R2 --> G2
+
+    P3 --> G3{Sync 게이트<br/>Turso conflict, Web/Mobile write path}
+    G3 -->|통과| P4[Phase 4<br/>Review, Replay, Polish]
+    G3 -->|모바일 불확실| M[React Native vs Tauri v2 Mobile spike]
+    M --> G3
+
+    P4 --> D[장기 dogfood<br/>diff, replay, cleanup, 권한 고도화]
+```
+
+```mermaid
+flowchart LR
+    Core[Core invariant<br/>Local-first Desktop] --> Phase1[Phase 1 MVP]
+    Core --> Phase2[Phase 2 Runtime]
+    Core --> Phase3[Phase 3 Sync]
+
+    Phase1 --> A[Single workspace<br/>Single Agent<br/>Crash recovery]
+    Phase2 --> B[Multi Agent<br/>Queue / watchdog<br/>CLI Bridge + Skill]
+    Phase3 --> C[Web/Mobile board<br/>Turso sync<br/>No raw log sync]
+
+    A --> Gate1{복구 가능?}
+    B --> Gate2{병렬 실행 안전?}
+    C --> Gate3{동기화 충돌 표시?}
+
+    Gate1 -->|yes| Phase2
+    Gate2 -->|yes| Phase3
+    Gate3 -->|yes| Phase4[Phase 4 Polish]
+```
 
 ### Phase 0 — Technical Spike
 
